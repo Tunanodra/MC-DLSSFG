@@ -4,8 +4,8 @@
 
 在 Minecraft 里接上现代超分和帧生成：DLSS、XeSS、FSR2，以及完整的 **DLSS FG（Frame Generation）** 支持。
 
-> 灵感来自 [IReallyWantToSleep/superresolution](https://github.com/IReallyWantToSleep/superresolution)。  
-> 本仓库是独立实现与扩展，不是对方项目的 fork 发布页。
+> 灵感来自 [IReallyWantToSleep/superresolution](https://github.com/IReallyWantToSleep/superresolution)
+
 
 ---
 
