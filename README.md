@@ -1,6 +1,6 @@
 # MC-DLSSFG (MCDLSSG)
 
-**Tunanodra** 的个人作品。
+这个MOD是为了给我自己的服务器使用
 
 在 Minecraft 里接上现代超分和帧生成：DLSS、XeSS、FSR2，以及完整的 **DLSS FG（Frame Generation）** 支持。
 
