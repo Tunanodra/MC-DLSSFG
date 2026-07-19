@@ -1,0 +1,21 @@
+{
+    "required": true,
+    "package": "com.dgtdi.mcdlssg.common.mixin",
+    "plugin": "com.dgtdi.mcdlssg.common.mixin.MixinPlugin",
+    "compatibilityLevel": "JAVA_8",
+    "minVersion": "0.8",
+    "client": [
+        "core.DLSSGStatusOverlayMixin",
+        "core.PostChainMixin",
+        "core.WindowMixin",
+        "core.parts.LevelRendererMixinCommon",
+        "debug.DebugScreenOverlayMixin"
+    ],
+    "mixins": [
+
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    },
+    "refmap": "mcdlssg.refmap.json"
+}

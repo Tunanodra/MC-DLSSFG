@@ -1,0 +1,332 @@
+/*
+ * Super Resolution
+ * Copyright (c) 2025-2026. 187J3X1-114514
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package com.dgtdi.mcdlssg.core;
+
+import com.dgtdi.mcdlssg.api.platform.OperatingSystem;
+import com.dgtdi.mcdlssg.api.platform.OperatingSystemType;
+import com.dgtdi.mcdlssg.api.platform.SystemArchitecture;
+import com.dgtdi.mcdlssg.core.utils.MessageBox;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+
+public class NativeLibManager {
+    public static final String BASE_PATH = "lib";
+    public static final Logger LOGGER = LoggerFactory.getLogger("MCDLSSG/NativeLib");
+
+    #if USE_DEBUG_LIB == 1
+    public static final boolean USE_DEBUG_LIB = true;
+    #else
+    public static final boolean USE_DEBUG_LIB = false;
+    #endif
+    private static final List<NativeLib> libs = new ArrayList<>();
+    public static NativeLib LIB_SUPER_RESOLUTION = null;
+    public static NativeLib LIB_SUPER_RESOLUTION_XESS = null;
+    public static NativeLib LIB_SUPER_RESOLUTION_NGX = null;
+    public static NativeLib LIB_SUPER_RESOLUTION_STREAMLINE = null;
+    public static NativeLib LIB_STREAMLINE_INTERPOSER = null;
+    public static NativeLib LIB_STREAMLINE_COMMON = null;
+    public static NativeLib LIB_STREAMLINE_DLSS_G = null;
+    public static NativeLib LIB_STREAMLINE_REFLEX = null;
+    public static NativeLib LIB_STREAMLINE_NVNGX_REFLEX = null;
+    public static NativeLib LIB_STREAMLINE_PCL = null;
+    public static NativeLib LIB_NVNGX_DLSSG = null;
+    public static NativeLib LIB_NVNGX_DLSS = null;
+    public static NativeLib LIB_XESS = null;
+    private static boolean nativeApiAvailable;
+    private static boolean librariesExtracted;
+    private static boolean librariesLoaded;
+
+    static {
+        OperatingSystem operatingSystem = new OperatingSystem();
+        if (operatingSystem.type == OperatingSystemType.WINDOWS && operatingSystem.arch == SystemArchitecture.X86_64) {
+            LIB_SUPER_RESOLUTION = new NativeLib("MCDLSSG", true, true);
+            LIB_SUPER_RESOLUTION_XESS = new NativeLib("MCDLSSGXeSS", false, false);
+            LIB_SUPER_RESOLUTION_NGX = new NativeLib("MCDLSSGNGX", false, false);
+            LIB_SUPER_RESOLUTION_STREAMLINE = new NativeLib("MCDLSSGStreamline", false, false);
+            LIB_STREAMLINE_COMMON = new NativeLib("sl.common", false, false, true);
+            LIB_STREAMLINE_INTERPOSER = new NativeLib("sl.interposer", false, false, true);
+            LIB_STREAMLINE_DLSS_G = new NativeLib("sl.dlss_g", false, false, true);
+            LIB_STREAMLINE_REFLEX = new NativeLib("sl.reflex", false, false, true);
+            LIB_STREAMLINE_PCL = new NativeLib("sl.pcl", false, false, true);
+            LIB_STREAMLINE_NVNGX_REFLEX = new NativeLib("NvLowLatencyVk", false, false, true);
+            LIB_NVNGX_DLSSG = new NativeLib("nvngx_dlssg", false, false, true);
+            LIB_NVNGX_DLSS = new NativeLib("nvngx_dlss", false, false, true);
+            LIB_XESS = new NativeLib("libxess", false, false, true);
+            libs.add(LIB_SUPER_RESOLUTION);
+            libs.add(LIB_SUPER_RESOLUTION_XESS);
+            libs.add(LIB_SUPER_RESOLUTION_NGX);
+            libs.add(LIB_STREAMLINE_COMMON);
+            libs.add(LIB_STREAMLINE_INTERPOSER);
+            libs.add(LIB_SUPER_RESOLUTION_STREAMLINE);
+            libs.add(LIB_STREAMLINE_DLSS_G);
+            libs.add(LIB_STREAMLINE_REFLEX);
+            libs.add(LIB_STREAMLINE_PCL);
+            libs.add(LIB_STREAMLINE_NVNGX_REFLEX);
+            libs.add(LIB_NVNGX_DLSSG);
+            libs.add(LIB_NVNGX_DLSS);
+            libs.add(LIB_XESS);
+        } else if (operatingSystem.type == OperatingSystemType.ANDROID && operatingSystem.arch == SystemArchitecture.AARCH64) {
+            LIB_SUPER_RESOLUTION = new NativeLib("MCDLSSG", true, true);
+            libs.add(LIB_SUPER_RESOLUTION);
+
+        } else if (operatingSystem.type == OperatingSystemType.LINUX && operatingSystem.arch == SystemArchitecture.X86_64) {
+            LIB_SUPER_RESOLUTION = new NativeLib("MCDLSSG", true, true);
+            LIB_SUPER_RESOLUTION_NGX = new NativeLib("MCDLSSGNGX", true, false);
+            libs.add(LIB_SUPER_RESOLUTION);
+            libs.add(LIB_SUPER_RESOLUTION_NGX);
+
+        } else if (operatingSystem.type == OperatingSystemType.MACOS && operatingSystem.arch == SystemArchitecture.AARCH64) {
+            LIB_SUPER_RESOLUTION = new NativeLib("MCDLSSG", true, true);
+            libs.add(LIB_SUPER_RESOLUTION);
+        }
+    }
+
+    public static boolean nativeApiAvailable() {
+        return nativeApiAvailable;
+    }
+
+    public static void createLibraryDir(Path path) {
+        File dir = path.toFile();
+        if (!dir.exists() && !dir.mkdirs()) {
+            LOGGER.error("无法创建目录: {}", dir);
+        }
+    }
+
+    public static synchronized void extract(Path path) {
+        if (librariesExtracted) {
+            return;
+        }
+        LOGGER.info("开始提取依赖库文件");
+        createLibraryDir(path);
+        List<String> requiredFailures = new ArrayList<>();
+        List<String> optionalFailures = new ArrayList<>();
+
+        for (NativeLib lib : libs) {
+            try {
+                if (!extractLibrary(path, lib)) {
+                    if (lib.required) {
+                        requiredFailures.add(lib.fileName);
+                        LOGGER.error("必要依赖库 {} 提取失败", lib.fileName);
+                    } else {
+                        optionalFailures.add(lib.fileName);
+                        LOGGER.warn("可选依赖库 {} 提取失败，已跳过", lib.fileName);
+                    }
+                }
+            } catch (Exception e) {
+                if (lib.required) {
+                    requiredFailures.add(lib.fileName);
+                    LOGGER.error("必要依赖库 {} 提取失败: {}", lib.fileName, e.getMessage());
+                    LOGGER.error("原生库提取错误详情", e);
+                } else {
+                    optionalFailures.add(lib.fileName);
+                    LOGGER.warn("可选依赖库 {} 提取失败，已跳过: {}", lib.fileName, e.getMessage());
+                }
+            }
+        }
+
+        if (!requiredFailures.isEmpty()) {
+            String errorMsg = String.join(", ", requiredFailures);
+            LOGGER.error("必要依赖库提取失败: {}", errorMsg);
+            MessageBox.createError(
+                    "MCDLSSG在提取必要依赖库时失败，失败的库：%s".formatted(errorMsg),
+                    "Error"
+            );
+            throw new RuntimeException("必要依赖库提取失败: " + errorMsg);
+        }
+
+        if (!optionalFailures.isEmpty()) {
+            LOGGER.info("已跳过以下可选依赖库: {}", String.join(", ", optionalFailures));
+        }
+
+        LOGGER.info("依赖库文件已提取到 {}", path);
+        librariesExtracted = true;
+    }
+
+    public static synchronized void load(Path path) {
+        if (librariesLoaded) {
+            nativeApiAvailable = true;
+            return;
+        }
+        createLibraryDir(path);
+        for (NativeLib lib : libs) {
+            if (lib.extractedPath == null) {
+                if (lib.required) {
+                    LOGGER.error("必要依赖库 {} 未提取，无法加载", lib.fileName);
+                    throw new RuntimeException("必要依赖库 " + lib.fileName + " 未提取");
+                } else {
+                    LOGGER.warn("可选依赖库 {} 未提取，已跳过加载", lib.fileName);
+                    continue;
+                }
+            }
+
+            File f = lib.getTargetPath(path).toFile();
+            if (lib.loadAtStartup) {
+                try {
+                    LOGGER.info("加载依赖库： {}", f.getAbsolutePath());
+                    System.load(f.getAbsolutePath());
+                    lib.available = true;
+                } catch (Throwable e) {
+                    if (lib.required) {
+                        LOGGER.error("必要依赖库 {} 加载失败: {}", lib.fileName, e.getMessage());
+                        throw new RuntimeException("必要依赖库加载失败: " + lib.fileName, e);
+                    } else {
+                        LOGGER.warn("可选依赖库 {} 加载失败，已跳过: {}", lib.fileName, e.getMessage());
+                        lib.available = false;
+                    }
+                }
+            }
+        }
+        librariesLoaded = true;
+        nativeApiAvailable = true;
+    }
+
+    private static boolean _writeFile(InputStream in, String path) throws IOException {
+        if (in == null) {
+            return false;
+        }
+        Path filePath = Path.of(path);
+        Files.copy(in, filePath, StandardCopyOption.REPLACE_EXISTING);
+        return true;
+    }
+
+    private static boolean extractLibrary(Path path, NativeLib library) throws IOException {
+        Path sourcePath = Paths.get(BASE_PATH, library.fileName);
+        Path targetPath = library.getTargetPath(path);
+
+        try (
+                InputStream in = NativeLibManager.class.getClassLoader()
+                        .getResourceAsStream(sourcePath.toString().replace("\\", "/"))
+        ) {
+            if (in == null) {
+                if (library.required) {
+                    LOGGER.error("必要依赖库 {} 提取失败：资源未找到", sourcePath);
+                } else {
+                    LOGGER.warn("可选依赖库 {} 提取失败：资源未找到", sourcePath);
+                }
+                return false;
+            }
+            if (_writeFile(in, targetPath.toString())) {
+                library.extractedPath = targetPath;
+                LOGGER.info("{} 提取成功", library.fileName);
+                return true;
+            } else {
+                if (library.required) {
+                    throw new IOException("必要依赖库 " + library.fileName + " 提取失败");
+                } else {
+                    LOGGER.warn("可选依赖库 {} 提取失败", library.fileName);
+                    return false;
+                }
+            }
+        } catch (IOException e) {
+            if (library.required) {
+                LOGGER.error("必要依赖库 {} 提取失败; 信息: {}", library.fileName, e.toString());
+                throw e;
+            } else {
+                LOGGER.warn("可选依赖库 {} 提取失败; 信息: {}", library.fileName, e.toString());
+                return false;
+            }
+        }
+    }
+
+    public static class NativeLib {
+        public final String baseName;
+        public final String fileName;
+        public final boolean loadAtStartup;
+        public final boolean required;
+        public final Path preExtractPath;
+        public Path extractedPath;
+        public boolean available;
+        public boolean nameIsPath;
+        public Path targetPath;
+
+        public NativeLib(String baseName, boolean loadAtStartup, boolean required) {
+            this(baseName, loadAtStartup, required, false);
+        }
+
+        public NativeLib(String baseName, boolean loadAtStartup, boolean required, boolean nameIsPath) {
+            this(baseName, loadAtStartup, required, nameIsPath, null);
+        }
+
+        public NativeLib(String baseName, boolean loadAtStartup, boolean required, boolean nameIsPath, Path targetPath) {
+            this.baseName = baseName;
+            this.loadAtStartup = loadAtStartup;
+            this.required = required;
+            this.fileName = buildFullFileName(baseName, nameIsPath);
+            this.preExtractPath = Paths.get(BASE_PATH, this.fileName);
+            this.nameIsPath = nameIsPath;
+            this.targetPath = targetPath;
+        }
+
+        private static String buildFullFileName(String baseName, boolean nameIsPath) {
+            OperatingSystem operatingSystem = new OperatingSystem();
+            StringBuilder sb = new StringBuilder();
+            if (!nameIsPath) {
+                sb.append("lib");
+                sb.append(baseName);
+
+                if (operatingSystem.type == OperatingSystemType.WINDOWS) {
+                    sb.append("+win64");
+                } else if (operatingSystem.type == OperatingSystemType.LINUX) {
+                    sb.append("+linux64");
+                } else if (operatingSystem.type == OperatingSystemType.MACOS) {
+                    sb.append("+macarm64");
+                } else if (operatingSystem.type == OperatingSystemType.ANDROID) {
+                    sb.append("+android");
+                }
+
+                if (USE_DEBUG_LIB) {
+                    sb.append("+debug");
+                } else {
+                    sb.append("+release");
+                }
+            } else {
+                sb.append(baseName);
+            }
+
+            if (operatingSystem.type == OperatingSystemType.WINDOWS) {
+                sb.append(".dll");
+            } else if (operatingSystem.type == OperatingSystemType.LINUX || operatingSystem.type == OperatingSystemType.ANDROID) {
+                sb.append(".so");
+            } else if (operatingSystem.type == OperatingSystemType.MACOS) {
+                sb.append(".dylib");
+            }
+
+            return sb.toString();
+        }
+
+        public Path getTargetPath(Path root) {
+            if (targetPath != null) {
+                this.extractedPath = targetPath.resolve(fileName);
+            } else {
+                this.extractedPath = root.resolve(fileName);
+            }
+            return this.extractedPath;
+        }
+    }
+}

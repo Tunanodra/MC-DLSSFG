@@ -1,0 +1,38 @@
+modLoader = "javafml"
+loaderVersion = "*"
+issueTrackerURL = "https://dgtdi.com"
+license = "MIT"
+
+[[mods]]
+modId = "mcdlssg"
+version = "${version}"
+displayName = "MCDLSSG"
+authors = "Tunanodra"
+description = '''
+DLSS / XeSS / FSR2 upscaling with DLSS Frame Generation for Minecraft.
+Inspired by the Super Resolution project (https://github.com/IReallyWantToSleep/superresolution).
+'''
+logoFile = "assets/mcdlssg/textures/gui/logo.png"
+
+[[dependencies.mcdlssg]]
+modId = "minecraft"
+mandatory = true
+versionRange = "{versionRange}"
+ordering = "NONE"
+side = "BOTH"
+
+[mods."sodium:options"]
+"mixin.features.render.gui.debug" = false
+
+[[mixins]]
+config = "mcdlssg.mixins.json"
+[[mixins]]
+config = "mcdlssg.hack.mixins.json"
+[[mixins]]
+config = "mcdlssg-forge.mixins.json"
+[[mixins]]
+config = "mcdlssg-forge-compat.mixins.json"
+[[mixins]]
+config = "mcdlssg.shadercompat.mixins.json"
+[[mixins]]
+config = "mcdlssg_irisapi.mixins.json"

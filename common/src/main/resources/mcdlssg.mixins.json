@@ -1,0 +1,35 @@
+{
+    "required": true,
+    "package": "com.dgtdi.mcdlssg.common.mixin",
+    "plugin": "com.dgtdi.mcdlssg.common.mixin.MixinPlugin",
+    "compatibilityLevel": "JAVA_8",
+    "minVersion": "0.8",
+    "client": [
+        "core.ForceOpenGLVersion_WindowMixin",
+        "core.GameRendererMixin",
+        "core.GlDebugMixin",
+        "core.GlTextureViewMixin",
+        "core.GLXMixin",
+        "core.MinecraftMixin",
+        "core.OptionsMixin",
+        "core.accessor.LevelRendererAccessor",
+        "core.accessor.MinecraftAccessor",
+        "core.accessor.OptionInstanceAccessor",
+        "core.accessor.PostChainAccessor",
+        "core.accessor.WindowAccessor",
+        "debug.ImguiMixin",
+        "debug.KeyboardHandlerMixin",
+        "gui.AbstractWidgetAccessor",
+        "gui.GameRendererAccessor",
+        "gui.GuiGraphicsAccessor",
+        "gui.GuiRendererMixin",
+        "gui.GuiRendererDrawAccessor"
+    ],
+    "mixins": [
+
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    },
+    "refmap": "mcdlssg.refmap.json"
+}

@@ -1,0 +1,185 @@
+/*
+ * Super Resolution
+ * Copyright (c) 2025-2026. 187J3X1-114514
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package com.dgtdi.mcdlssg.core;
+
+import com.dgtdi.mcdlssg.api.platform.OperatingSystemType;
+import com.dgtdi.mcdlssg.api.platform.Platform;
+import com.dgtdi.mcdlssg.common.MCDLSSG;
+import com.dgtdi.mcdlssg.common.config.MCDLSSGConfig;
+import com.dgtdi.mcdlssg.common.minecraft.B3DVulkanBridge;
+import com.dgtdi.mcdlssg.core.graphics.opengl.GlRenderSystem;
+import com.dgtdi.mcdlssg.core.graphics.system.IRenderSystem;
+import com.dgtdi.mcdlssg.core.graphics.vulkan.VkRenderSystem;
+import com.dgtdi.mcdlssg.core.graphics.vulkan.VulkanException;
+import com.dgtdi.mcdlssg.core.streamline.Streamline;
+import org.lwjgl.vulkan.KHRExternalMemoryFd;
+import org.lwjgl.vulkan.KHRExternalSemaphoreFd;
+import org.lwjgl.vulkan.VK;
+
+import static org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+import static org.lwjgl.vulkan.EXTMutableDescriptorType.VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME;
+import static org.lwjgl.vulkan.EXTPrivateData.VK_EXT_PRIVATE_DATA_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRDedicatedAllocation.VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRExternalMemory.VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRExternalMemoryCapabilities.VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRExternalMemoryWin32.VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRExternalSemaphore.VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRExternalSemaphoreCapabilities.VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRExternalSemaphoreWin32.VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRGetMemoryRequirements2.VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRPushDescriptor.VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRShaderFloat16Int8.VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRShaderIntegerDotProduct.VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME;
+import static org.lwjgl.vulkan.KHRDynamicRendering.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME;
+
+public class RenderSystems {
+    private static VkRenderSystem vulkan;
+    private static GlRenderSystem opengl;
+
+    public static void init() {
+        opengl = new GlRenderSystem();
+        opengl.initRenderSystem();
+        initVulkan();
+    }
+
+
+    public static void destroy() {
+        if (opengl != null) {
+            opengl.destroyRenderSystem();
+        }
+        if (vulkan != null) {
+            vulkan.destroyRenderSystem();
+        }
+    }
+
+    public static boolean isSupportVulkan() {
+        return vulkan != null;
+    }
+
+    public static boolean isSupportOpenGL() {
+        return true;
+    }
+
+    public static boolean initBorrowedB3DVulkanIfAvailable() {
+        #if MC_VER >= MC_26_2
+        if (vulkan != null) {
+            return true;
+        }
+        if (!B3DVulkanBridge.isB3DVulkanBackend()) {
+            return false;
+        }
+        try {
+            VK.create();
+        } catch (Exception | Error e) {
+            if (e.getMessage() == null || !e.getMessage().contains("Vulkan has already been created")) {
+                VkRenderSystem.LOGGER.error("Vulkan 初始化失败，似乎缺少Vulkan运行库，错误 {}", e.getMessage());
+                VkRenderSystem.LOGGER.error("Vulkan 初始化错误详情", e);
+                return false;
+            }
+        }
+        try {
+            vulkan = VkRenderSystem.borrowed(
+                    B3DVulkanBridge.vkInstance(),
+                    B3DVulkanBridge.vkPhysicalDevice(),
+                    B3DVulkanBridge.vkDevice(),
+                    B3DVulkanBridge.graphicsQueueFamilyIndex()
+            );
+            return true;
+        } catch (Throwable t) {
+            VkRenderSystem.LOGGER.error("无法从Blaze3D 创建 Vulkan device", t);
+            vulkan = null;
+            return false;
+        }
+        #else
+        return false;
+        #endif
+    }
+
+    private static void initVulkan() {
+        if (MCDLSSGConfig.isSkipInitVulkan() && !MCDLSSGConfig.isEnableDLSSFrameGeneration()) {
+            return;
+        }
+
+        try {
+            VK.create();
+        } catch (Exception | Error e) {
+            if (!e.getMessage().contains("Vulkan has already been created")) {
+                VkRenderSystem.LOGGER.error("Vulkan初始化失败，似乎缺少Vulkan运行库，错误 {}", e.getMessage());
+                VkRenderSystem.LOGGER.error("Vulkan 初始化错误详情", e);
+                return;
+            }
+        }
+        vulkan = new VkRenderSystem();
+        if (MCDLSSGConfig.isEnableDLSSFrameGeneration()) {
+            vulkan.addInstanceExtension("VK_KHR_surface");
+            if (Platform.currentPlatform.getOS().type == OperatingSystemType.WINDOWS) {
+                vulkan.addInstanceExtension("VK_KHR_win32_surface");
+            }
+        }
+        vulkan.addInstanceExtension(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME)
+                .addInstanceExtension(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME)
+                .addInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
+                .addDeviceExtension(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME)
+                .addDeviceExtension(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME)//XeSS
+                .addDeviceExtension(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME)//XeSS
+                .addDeviceExtension(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)//XeSS
+                .addDeviceExtension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME)
+                .addDeviceExtension(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME)
+                .addDeviceExtension(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME)
+                .addDeviceExtension("VK_EXT_descriptor_indexing")
+                .addDeviceExtension("VK_NVX_binary_import")
+                .addDeviceExtension("VK_NVX_image_view_handle")
+                .addDeviceExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
+                .addDeviceExtension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)
+                .addDeviceExtension(VK_EXT_PRIVATE_DATA_EXTENSION_NAME);
+        if (MCDLSSGConfig.isEnableDLSSFrameGeneration()) {
+            vulkan.addDeviceExtension("VK_KHR_swapchain");
+        }
+        if (Platform.currentPlatform.getOS().type == OperatingSystemType.WINDOWS) {
+            vulkan.addDeviceExtension(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME)
+                    .addDeviceExtension(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
+        }
+        if (Platform.currentPlatform.getOS().type == OperatingSystemType.LINUX) {
+            vulkan.addDeviceExtension(KHRExternalMemoryFd.VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME)
+                    .addDeviceExtension(KHRExternalSemaphoreFd.VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+        }
+        try {
+            vulkan.initRenderSystem();
+            return;
+        } catch (VulkanException vkException) {
+            VkRenderSystem.LOGGER.error("Vulkan初始化失败，已禁用Vulkan", vkException);
+        } catch (Throwable e) {
+            VkRenderSystem.LOGGER.error("Vulkan初始化失败，发生未知错误，已禁用Vulkan", e);
+        }
+        vulkan = null;
+    }
+
+    public static GlRenderSystem opengl() {
+        return opengl;
+    }
+
+    public static VkRenderSystem vulkan() {
+        return vulkan;
+    }
+
+    public static IRenderSystem current() {
+
+        return MCDLSSG.isUsingVulkan?vulkan: opengl;
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "required": true,
+    "package": "com.dgtdi.mcdlssg.shadercompat.mixin",
+    "plugin": "com.dgtdi.mcdlssg.shadercompat.mixin.IrisShaderCompatMixinPlugin",
+    "compatibilityLevel": "JAVA_8",
+    "minVersion": "0.8",
+    "client": [
+        "core.CompositeRendererAccessor",
+        "core.IrisRenderingPipelineAccessor",
+        "core.IrisRenderingPipelineMixin",
+        "core.RenderTargetsAccessor",
+        "core.ShaderPackAccessor",
+        "core.ShaderPackMixin",
+        "core.IrisMixin",
+        "core.MixinTheFuckingStupidGLDebug",
+        "core.PackRenderTargetDirectivesAccessor",
+        "core.PackRenderTargetDirectivesMixin",
+        "core.PipelineManagerMixin"
+    ],
+    "mixins": [
+
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    },
+    "refmap": "mcdlssg.refmap.json"
+}

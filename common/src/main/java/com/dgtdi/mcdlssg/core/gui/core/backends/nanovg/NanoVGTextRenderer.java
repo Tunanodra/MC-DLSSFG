@@ -1,0 +1,193 @@
+/*
+ * Super Resolution
+ * Copyright (c) 2025-2026. 187J3X1-114514
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package com.dgtdi.mcdlssg.core.gui.core.backends.nanovg;
+
+import com.dgtdi.mcdlssg.core.gui.core.backends.interfaces.IFont;
+import com.dgtdi.mcdlssg.core.gui.core.backends.interfaces.TextAlign;
+import com.dgtdi.mcdlssg.core.gui.core.backends.interfaces.TextAlignType;
+import com.dgtdi.mcdlssg.core.gui.core.backends.interfaces.TextMetrics;
+import com.dgtdi.mcdlssg.core.utils.Color;
+import com.dgtdi.mcdlssg.thirdparty.nanovg.NVGtextRow;
+import com.dgtdi.mcdlssg.thirdparty.nanovg.NanoVGColor;
+import org.joml.Vector2f;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+public class NanoVGTextRenderer extends NanoVGRendererBase {
+
+    public NanoVGTextRenderer(NanoVGContextWrapper context) {
+    }
+
+    private float[] measureTextBounds(IFont font, String text, float fontSize, float lineHeight, float weight) {
+        if (text == null || text.isEmpty()) {
+            return null;
+        }
+        contextPtr.fontFace(font.name());
+        contextPtr.fontSize(fontSize);
+        contextPtr.textLineHeight(lineHeight);
+        contextPtr.fontSetVariationAxis(font.nativeId(), "wght", weight);
+        return contextPtr.textBounds(0, 0, text).bounds;
+    }
+
+    public float measureTextWidth(IFont font, String text, float fontSize, float lineHeight, float weight) {
+        float[] bounds = measureTextBounds(font, text, fontSize, lineHeight, weight);
+        if (bounds == null) return 0;
+        return (bounds[2] - bounds[0]);
+    }
+
+    public float measureTextHeight(IFont font, String text, float fontSize, float lineHeight, float weight) {
+        float[] bounds = measureTextBounds(font, text, fontSize, lineHeight, weight);
+        if (bounds == null) return 0;
+        return (bounds[3] - bounds[1]) - 2;
+    }
+
+    public Vector2f measureText(IFont font, String text, float fontSize, float lineHeight, float weight) {
+        float[] bounds = measureTextBounds(font, text, fontSize, lineHeight, weight);
+        if (bounds == null) return new Vector2f(0);
+        return new Vector2f(
+                (bounds[2] - bounds[0]),
+                (bounds[3] - bounds[1]) - 2.5f
+        );
+    }
+
+    public void drawAlignedText(
+            IFont font, float fontSize, String text,
+            float startX, float startY, float maxWidth, float lineHeight,
+            float weight, Color color, TextAlign align, boolean wrap) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        if (align == null) {
+            align = TextAlign.of(TextAlignType.ALIGN_LEFT, TextAlignType.ALIGN_TOP);
+        }
+        color = color.copy().alpha((int) (nvg.globalAlpha() * color.alpha()));
+        NanoVGColor vgColor = contextPtr.colorRGBA(color.red(), color.green(), color.blue(), color.alpha());
+        String fontName = font.name();
+
+        contextPtr.save();
+        TextMetrics metrics = calculateTextMetrics(font, fontSize, text, maxWidth, lineHeight, wrap, weight);
+        contextPtr.textAlign(toNvgAlign(align.horizontal()) | toNvgAlign(align.vertical()));
+        contextPtr.fontSize(fontSize);
+        contextPtr.fontFace(fontName);
+        contextPtr.fontSetVariationAxis(font.nativeId(), "wght", weight);
+        contextPtr.fillColor(vgColor);
+
+        float yPos = startY + 1.5f;
+        for (String line : metrics.lines) {
+            contextPtr.text(startX, yPos, line);
+            yPos += lineHeight;
+        }
+        contextPtr.restore();
+    }
+
+    public void drawAlignedText(
+            IFont font, float fontSize, TextMetrics metrics,
+            float startX, float startY, float maxWidth, float lineHeight,
+            float weight, Color color, TextAlign align, boolean wrap) {
+        if (align == null) {
+            align = TextAlign.of(TextAlignType.ALIGN_LEFT, TextAlignType.ALIGN_TOP);
+        }
+        color = color.copy().alpha((int) (nvg.globalAlpha() * color.alpha()));
+        NanoVGColor vgColor = contextPtr.colorRGBA(color.red(), color.green(), color.blue(), color.alpha());
+        String fontName = font.name();
+
+        contextPtr.save();
+        contextPtr.textAlign(toNvgAlign(align.horizontal()) | toNvgAlign(align.vertical()));
+        contextPtr.fontSize(fontSize);
+        contextPtr.fontFace(fontName);
+        contextPtr.fontSetVariationAxis(font.nativeId(), "wght", weight);
+        contextPtr.fillColor(vgColor);
+
+        float yPos = startY + 1.5f;
+        for (String line : metrics.lines) {
+            contextPtr.text(startX, yPos, line);
+            yPos += lineHeight;
+        }
+        contextPtr.restore();
+    }
+
+    private int toNvgAlign(TextAlignType alignType) {
+        return switch (alignType) {
+            case ALIGN_LEFT -> 1;
+            case ALIGN_CENTER -> 2;
+            case ALIGN_RIGHT -> 4;
+            case ALIGN_TOP -> 8;
+            case ALIGN_MIDDLE -> 16;
+            case ALIGN_BOTTOM -> 32;
+        };
+    }
+
+    public TextMetrics calculateTextMetrics(IFont font, float fontSize,
+                                            String text, float maxWidth,
+                                            float lineHeight, boolean wrap,
+                                            float weight) {
+        if (text == null || text.isEmpty()) {
+            return new TextMetrics(List.of(), 0, 0);
+        }
+        contextPtr.save();
+        contextPtr.fontSize(fontSize);
+        contextPtr.textLineHeight(lineHeight);
+        contextPtr.fontFace(font.name());
+        contextPtr.fontSetVariationAxis(font.nativeId(), "wght", weight);
+
+        List<String> lines = new ArrayList<>();
+        String[] paragraphs = text.split("\n", -1);
+        for (String paragraph : paragraphs) {
+            if (wrap && maxWidth > 0) {
+                List<NVGtextRow> rows = contextPtr.textBreakLines(paragraph, maxWidth);
+                if (rows != null && !rows.isEmpty()) {
+                    for (NVGtextRow row : rows) {
+                        lines.add(extractRowText(row));
+                    }
+                } else {
+                    lines.add("");
+                }
+            } else {
+                lines.add(paragraph);
+            }
+        }
+        float maxLineWidth = 0;
+        for (String line : lines) {
+            // 直接使用已设置字重的上下文测量
+            float[] bounds = contextPtr.textBounds(0, 0, line).bounds;
+            float width = bounds[2] - bounds[0];
+            if (width > maxLineWidth) {
+                maxLineWidth = width;
+            }
+        }
+        contextPtr.restore();
+        return new TextMetrics(lines, Math.max(fontSize, lineHeight), maxLineWidth);
+    }
+
+    private String extractRowText(NVGtextRow row) {
+        if (row == null || row.start == null) {
+            return "";
+        }
+        if (row.end == null) {
+            return row.start;
+        }
+        int endLength = row.end.length();
+        int startLength = row.start.length();
+        int length = Math.max(startLength - endLength, 0);
+        return row.start.substring(0, length);
+    }
+
+}
